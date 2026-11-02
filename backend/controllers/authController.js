@@ -107,12 +107,12 @@ export const register = async (req, res, next) => {
             const userData = { name, email, password, role: userRole, phone };
 
             if (userRole === 'citizen') {
-                  const { pincode, latitude, longitude, nearbyLocation, completeAddress, dob, gender } = req.body;
+                  const { pincode, latitude, longitude, nearbyLocation, completeAddress, country, dob, gender } = req.body;
                   Object.assign(userData, {
                         nearbyLocation,
                         completeAddress,
                         address: completeAddress || req.body.address, // legacy fallback
-                        city, state, pincode, latitude, longitude,
+                        city, state, pincode, country, latitude, longitude,
                         dob, gender,
                         govtIdType, govtIdNumber,
                   });

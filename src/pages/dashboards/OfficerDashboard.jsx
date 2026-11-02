@@ -25,6 +25,7 @@ import {
 } from '../../api/officer';
 import ComplaintMapView from '../../components/maps/ComplaintMapView';
 import StatusBadge from '../../components/citizen/StatusBadge';
+import DashboardActivityFeed from '../../components/DashboardActivityFeed';
 import { deptLabel } from '../../utils/complaintConstants';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { generateReportText, finalizeResolutionAndSend } from '../../api/reports';
@@ -192,7 +193,7 @@ function DetailModal({ complaint, source, note, setNote, actionLoading, acceptin
 
               {/* Generative AI report creation loading skeleton */}
               {isGenerating && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="p-5 bg-gradient-to-r from-blue-50/50 to-violet-50/50 border border-violet-100 rounded-2xl flex flex-col items-center justify-center gap-3 text-center py-8">
                   <div className="relative flex items-center justify-center">
                     <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -205,7 +206,7 @@ function DetailModal({ complaint, source, note, setNote, actionLoading, acceptin
 
               {/* Animated report draft preview */}
               {aiReport && !isGenerating && (
-                <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} 
+                <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
                   className="border border-slate-200 rounded-2xl overflow-hidden shadow-md bg-white flex flex-col">
                   <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-4 py-2.5 flex items-center justify-between text-white text-[10px] font-black tracking-wider rounded-t-2xl">
                     <span className="flex items-center gap-1.5">⚡ PREVIEW: COMPLAINT RESOLUTION REPORT</span>
@@ -215,11 +216,11 @@ function DetailModal({ complaint, source, note, setNote, actionLoading, acceptin
                     {aiReport}
                   </div>
                   <div className="p-3 bg-slate-100/50 border-t border-slate-100 flex gap-2">
-                    <button type="button" onClick={() => setAiReport('')} disabled={isFinalizing} 
+                    <button type="button" onClick={() => setAiReport('')} disabled={isFinalizing}
                       className="px-3 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors">
                       Edit Notes
                     </button>
-                    <button type="button" onClick={handleApproveAndResolve} disabled={isFinalizing} 
+                    <button type="button" onClick={handleApproveAndResolve} disabled={isFinalizing}
                       className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white text-xs font-black rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-all">
                       {isFinalizing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Finalizing...</> : <><CheckCircle2 className="w-3.5 h-3.5" /> Approve & Resolve</>}
                     </button>
@@ -461,7 +462,7 @@ export default function OfficerDashboard() {
             className="mb-6 p-6 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl text-white shadow-xl relative overflow-hidden border border-slate-800">
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
-            
+
             <div className="relative z-10">
               <div className="flex items-center gap-2.5 mb-5 border-b border-white/5 pb-4">
                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
@@ -498,6 +499,15 @@ export default function OfficerDashboard() {
             </div>
           </motion.div>
         )}
+
+        {/* Activity Feed */}
+        <div className="mb-6">
+          <DashboardActivityFeed
+            department={officer?.department}
+            limit={10}
+            autoRefresh={true}
+          />
+        </div>
 
         <div className="flex gap-2 mb-5 flex-wrap">
           {[

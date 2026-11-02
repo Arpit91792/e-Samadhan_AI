@@ -183,10 +183,12 @@ const VoiceComplaint = ({
 
                   let errorMsg = "Failed to analyze complaint";
 
-                  if (err.response?.data?.message) {
+                  if (err.response?.data?.message && err.response.data.message !== "AI complaint analysis failed") {
                         errorMsg = err.response.data.message;
                   } else if (err.response?.data?.error) {
-                        errorMsg = err.response.data.error;
+                        errorMsg = `AI analysis failed: ${err.response.data.error}`;
+                  } else if (err.response?.data?.message) {
+                        errorMsg = err.response.data.message;
                   } else if (err.message === "timeout of 15000ms exceeded") {
                         errorMsg = "AI analysis timed out. Please try again.";
                   } else if (!err.response) {

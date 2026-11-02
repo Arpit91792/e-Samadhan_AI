@@ -37,6 +37,8 @@ import faceRoutes from './routes/faceRoutes.js';
 import livenessRoutes from './routes/livenessRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import chatbotRoutes from './routes/chatbotRoutes.js';
+import activityRoutes from './routes/activityRoutes.js';
 import { initSocket } from './socket/index.js';
 
 // ── Register all Mongoose models ──────────────────────────────────────────────
@@ -52,6 +54,8 @@ import './models/Feedback.js';
 import './models/Verification.js';
 import './models/LivenessSession.js';
 import './models/LivenessAttempt.js';
+import './models/ChatHistory.js';
+import './models/Activity.js';
 import { cleanupLivenessData, autoResetOnStartup } from './services/livenessAttempts.js';
 
 // ── Database must connect before accepting traffic ───────────────────────────
@@ -138,6 +142,8 @@ app.use('/api/face', faceRoutes);
 app.use('/api/liveness', livenessRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/activities', activityRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

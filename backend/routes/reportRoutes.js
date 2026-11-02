@@ -5,7 +5,8 @@ import {
       getCitizenReports,
       submitReportFeedback,
       getOfficerAnalytics,
-      getAdminAnalytics
+      getAdminAnalytics,
+      downloadReportPdf
 } from '../controllers/reportController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -31,5 +32,8 @@ router.post('/send/:complaintId', authorize('officer', 'admin'), finalizeResolut
 
 // Citizen Rate & Feedback
 router.post('/rate/:complaintId', authorize('citizen'), submitReportFeedback);
+
+// Download Report PDF
+router.get('/download/:complaintId', authorize('citizen', 'officer', 'admin'), downloadReportPdf);
 
 export default router;

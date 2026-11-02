@@ -10,6 +10,7 @@ import {
       notifyStatusUpdate,
 } from '../services/notificationService.js';
 import { emitNewComplaintToDept, emitComplaintUpdate } from '../socket/index.js';
+import activityLogger from '../services/activityLogger.js';
 
 // @desc  File a new complaint
 // @route POST /api/complaints
@@ -76,6 +77,14 @@ export const fileComplaint = async (req, res, next) => {
             if (dept) {
                   await Department.findByIdAndUpdate(dept._id, { $inc: { 'stats.totalComplaints': 1, 'stats.pendingComplaints': 1 } });
             }
+
+            // Log activity
+            await activityLogger.logComplaintSubmitted(
+                  complaint._id,
+                  req.user._id,
+                  title,
+                  { category: finalCategory, priority: finalPriority }
+            );
 
             // Notify citizen
             await notifyComplaintFiled(req.user._id, complaint._id, title);
@@ -199,6 +208,17 @@ export const updateStatus = async (req, res, next) => {
 
             await complaint.save();
 
+            // Log activity
+            await activityLogger.logStatusChange(
+                  complaint._id,
+                  req.user._id,
+                  req.user.role,
+                  req.user.name,
+                  prevStatus,
+                  status,
+                  note
+            );
+
             // Update dept stats
             if (complaint.department) {
                   const updates = {};
@@ -246,6 +266,14 @@ export const assignComplaint = async (req, res, next) => {
             );
 
             if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found' });
+
+            // Log activity
+            await activityLogger.logComplaintAssigned(
+                  complaint._id,
+                  req.user._id,
+                  officerId,
+                  officer.name
+            );
 
             await notifyComplaintAssigned(officerId, complaint._id, complaint.title);
 
@@ -298,6 +326,15 @@ export const submitFeedback = async (req, res, next) => {
 
             complaint.feedback = { rating, comment: comment?.trim(), givenAt: new Date() };
             await complaint.save();
+
+            // Log activity
+            await activityLogger.logCitizenFeedback(
+                  complaint._id,
+                  req.user._id,
+                  req.user.name,
+                  rating,
+                  comment
+            );
 
             res.status(200).json({ success: true, message: 'Feedback submitted. Thank you!', feedback: complaint.feedback });
       } catch (error) { next(error); }

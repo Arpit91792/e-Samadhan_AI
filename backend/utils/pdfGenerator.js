@@ -7,7 +7,7 @@ import path from 'path';
  */
 const wrapText = (text, maxChars = 85) => {
       if (!text) return [];
-      
+
       // Clean up string to avoid encoding issues in standard PDF Helvetica fonts (WinAnsiEncoding)
       const cleanText = text
             .replace(/[\u2018\u2019]/g, "'")
@@ -15,7 +15,7 @@ const wrapText = (text, maxChars = 85) => {
             .replace(/[\u2013\u2014]/g, '-')
             .replace(/[\u2212]/g, '-')
             .replace(/[^\x00-\x7F]/g, '?'); // replace any non-ascii character
-      
+
       const paragraphs = cleanText.split('\n');
       const lines = [];
 
@@ -263,7 +263,7 @@ export const generateResolutionPdf = async (complaint, citizen, officer, resolve
 
       // Wrap the report content
       const reportLines = wrapText(complaint.resolutionReport || 'No report content available.', 90);
-      
+
       for (const line of reportLines) {
             if (y < 80) {
                   // If we exceed page space, truncate gracefully (this keeps it to a clean single page PDF)
@@ -343,13 +343,25 @@ export const generateResolutionPdf = async (complaint, citizen, officer, resolve
       // Save PDF to uploads/reports/
       const uploadsDir = path.join(process.cwd(), 'uploads', 'reports');
       if (!fs.existsSync(uploadsDir)) {
+            console.log(`📁 [pdfGenerator] Creating reports directory: ${uploadsDir}`);
             fs.mkdirSync(uploadsDir, { recursive: true });
       }
 
       const filename = `report_${complaint._id}.pdf`;
       const filePath = path.join(uploadsDir, filename);
+      console.log(`💾 [pdfGenerator] Saving PDF to: ${filePath}`);
       fs.writeFileSync(filePath, pdfBuffer);
 
+      // Verify file was created
+      if (fs.existsSync(filePath)) {
+            const stats = fs.statSync(filePath);
+            console.log(`✅ [pdfGenerator] PDF saved successfully. Size: ${stats.size} bytes`);
+      } else {
+            console.error(`❌ [pdfGenerator] Failed to save PDF file at: ${filePath}`);
+      }
+
       // Return local url
-      return `/uploads/reports/${filename}`;
+      const pdfUrl = `/uploads/reports/${filename}`;
+      console.log(`🔗 [pdfGenerator] PDF URL: ${pdfUrl}`);
+      return pdfUrl;
 };

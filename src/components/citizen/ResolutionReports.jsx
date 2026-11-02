@@ -47,21 +47,22 @@ export default function ResolutionReports() {
 
             setDownloadingId(report._id);
             try {
-                  const fileUrl = `${apiBase}${report.reportPdfUrl}`;
-                  const response = await fetch(fileUrl);
-                  const blob = await response.blob();
-                  
-                  const url = window.URL.createObjectURL(blob);
+                  // Use the API download endpoint
+                  const downloadUrl = `${apiBase}/api/reports/download/${report._id}`;
+
+                  // Create a temporary anchor element
                   const a = document.createElement('a');
                   a.style.display = 'none';
-                  a.href = url;
+                  a.href = downloadUrl;
                   a.download = `Resolution_Report_${report.complaintId || report._id}.pdf`;
+
+                  // Add authorization header through fetch if needed, but the API endpoint
+                  // will handle authentication via cookies/tokens
                   document.body.appendChild(a);
                   a.click();
-                  
-                  window.URL.revokeObjectURL(url);
                   document.body.removeChild(a);
-                  toast.success('Resolution PDF downloaded successfully!');
+
+                  toast.success('Resolution PDF download started!');
             } catch (err) {
                   console.error('Download failed:', err);
                   toast.error('Failed to download PDF report');
@@ -384,11 +385,10 @@ export default function ResolutionReports() {
                                                                   className="p-1 transition-transform hover:scale-125 focus:outline-none"
                                                             >
                                                                   <Star
-                                                                        className={`w-9 h-9 transition-colors ${
-                                                                              star <= (hoverRating || rating)
+                                                                        className={`w-9 h-9 transition-colors ${star <= (hoverRating || rating)
                                                                                     ? 'text-amber-500'
                                                                                     : 'text-slate-200'
-                                                                        }`}
+                                                                              }`}
                                                                         fill={star <= (hoverRating || rating) ? '#f59e0b' : 'none'}
                                                                         strokeWidth={1.5}
                                                                   />

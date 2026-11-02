@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { getAdminComplaints, getAdminOfficers, assignOfficer, updateComplaintStatus } from '../../api/admin';
+import { getAdminComplaints, getAdminOfficers, assignOfficer } from '../../api/admin';
 import StatusBadge from '../citizen/StatusBadge';
 import { deptLabel } from '../../utils/departmentMeta';
 
@@ -48,15 +48,7 @@ export default function AdminComplaints() {
             }
       };
 
-      const handleStatus = async (complaintId, newStatus) => {
-            try {
-                  await updateComplaintStatus(complaintId, newStatus);
-                  toast.success(t('adminComplaintsPage.statusUpdated'));
-                  load();
-            } catch (err) {
-                  toast.error(err.response?.data?.message || t('adminComplaintsPage.updateFailed'));
-            }
-      };
+
 
       return (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -94,16 +86,7 @@ export default function AdminComplaints() {
                                                             <option key={o._id} value={o._id}>{o.name} ({o.employeeId || 'no ID'})</option>
                                                       ))}
                                                 </select>
-                                                {['in_progress', 'resolved', 'rejected'].map((s) => (
-                                                      <button
-                                                            key={s}
-                                                            type="button"
-                                                            onClick={() => handleStatus(c._id, s)}
-                                                            className="text-xs px-2 py-1.5 rounded-lg bg-white/10 text-slate-300 hover:text-white capitalize"
-                                                      >
-                                                            {t(`status.${s}`, { defaultValue: s.replace('_', ' ') })}
-                                                      </button>
-                                                ))}
+
                                           </div>
                                     </div>
                               ))}

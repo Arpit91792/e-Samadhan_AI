@@ -4,7 +4,7 @@ import {
       X, User, BadgeCheck, Phone, Mail, Building2, Calendar, Clock,
       Shield, ShieldOff, ShieldCheck, Activity, ClipboardList, CheckCircle2, AlertTriangle,
       Zap, BarChart3, MapPin, ChevronRight, Eye, ArrowLeft, Loader2,
-      TrendingUp, Star, Timer, FileText, Image as ImageIcon,
+      TrendingUp, Star, Timer, FileText, Image as ImageIcon, DownloadCloud, FileText as FileTextIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -103,8 +103,19 @@ function ComplaintMap({ lat, lng, title }) {
 // ── Complaint Detail Modal (nested) ──────────────────────────────────────────
 function ComplaintDetailModal({ complaint, onClose }) {
       const { t } = useTranslation();
-      if (!complaint) return null;
       const apiBase = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+
+      // Log view activity when modal opens
+      React.useEffect(() => {
+            if (complaint) {
+                  // Import and call logComplaintViewed
+                  import('../../api/activities').then(module => {
+                        module.logComplaintViewed(complaint._id);
+                  }).catch(console.error);
+            }
+      }, [complaint]);
+
+      if (!complaint) return null;
 
       return (
             <motion.div
@@ -286,6 +297,55 @@ function ComplaintDetailModal({ complaint, onClose }) {
                                                             </div>
                                                       ))}
                                                 </div>
+                                          </div>
+                                    </div>
+                              )}
+
+                              {/* AI Resolution Report Section */}
+                              {complaint.status === 'resolved' && complaint.reportPdfUrl && (
+                                    <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-xl p-4">
+                                          <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-3">
+                                                AI Resolution Report
+                                          </h3>
+                                          <div className="space-y-3">
+                                                <div className="flex items-center gap-3">
+                                                      <FileTextIcon className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                                                      <div className="flex-1">
+                                                            <p className="text-sm font-medium text-white">AI-Generated Resolution Report</p>
+                                                            <p className="text-xs text-blue-300/80 mt-0.5">
+                                                                  Generated on: {complaint.reportGeneratedAt ? fmt(complaint.reportGeneratedAt) : 'N/A'}
+                                                            </p>
+                                                      </div>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                      <a
+                                                            href={`${apiBase}/api/reports/download/${complaint._id}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-colors"
+                                                      >
+                                                            <Eye className="w-4 h-4" />
+                                                            View PDF
+                                                      </a>
+                                                      <a
+                                                            href={`${apiBase}/api/reports/download/${complaint._id}`}
+                                                            download={`Resolution_Report_${complaint.complaintId || complaint._id}.pdf`}
+                                                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-colors"
+                                                      >
+                                                            <DownloadCloud className="w-4 h-4" />
+                                                            Download PDF
+                                                      </a>
+                                                </div>
+
+                                                {complaint.resolutionReport && (
+                                                      <div className="mt-3 p-3 bg-white/5 rounded-lg border border-white/10">
+                                                            <p className="text-xs text-slate-400 mb-2">Report Preview:</p>
+                                                            <p className="text-sm text-slate-300 line-clamp-3">
+                                                                  {complaint.resolutionReport.substring(0, 200)}...
+                                                            </p>
+                                                      </div>
+                                                )}
                                           </div>
                                     </div>
                               )}

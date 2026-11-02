@@ -5,6 +5,7 @@ import model from '../services/geminiService.js';
 import asyncHandler from '../middleware/asyncHandler.js';
 import sendEmail from '../utils/sendEmail.js';
 import { generateResolutionPdf } from '../utils/pdfGenerator.js';
+import activityLogger from '../services/activityLogger.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -84,6 +85,13 @@ Use professional, formal, and transparent government report language. Do NOT use
             const reportText = response.text().trim();
 
             console.log(`✅ [reportController] AI report generated for Complaint ${complaint.complaintId}`);
+
+            // Log activity
+            await activityLogger.logAIReportGenerated(
+                  complaint._id,
+                  req.user._id,
+                  req.user.name
+            );
 
             res.status(200).json({
                   success: true,
@@ -168,7 +176,7 @@ export const finalizeResolutionAndSendReport = asyncHandler(async (req, res) => 
             try {
                   const pdfPath = path.join(process.cwd(), pdfUrl);
                   console.log(`✉️ [reportController] Sending resolution email to citizen: ${citizenEmail}...`);
-                  
+
                   const emailHtml = `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <h2 style="color: #1d4ed8; border-bottom: 2px solid #eff6ff; padding-bottom: 10px;">e-Samadhan AI - Complaint Resolved</h2>
@@ -214,6 +222,14 @@ export const finalizeResolutionAndSendReport = asyncHandler(async (req, res) => 
 
       await complaint.save();
 
+      // Log activity
+      await activityLogger.logComplaintResolved(
+            complaint._id,
+            req.user._id,
+            req.user.name,
+            resolutionNotes
+      );
+
       // Update Department Stats
       if (complaint.department) {
             const updates = {};
@@ -237,7 +253,9 @@ export const finalizeResolutionAndSendReport = asyncHandler(async (req, res) => 
             success: true,
             message: 'Complaint resolved and PDF report delivered successfully!',
             complaint,
-            emailSent
+            emailSent,
+            reportPdfUrl: complaint.reportPdfUrl,
+            reportGenerated: true
       });
 });
 
@@ -293,7 +311,7 @@ export const submitReportFeedback = asyncHandler(async (req, res) => {
       // Update schema fields
       complaint.citizenRating = rating;
       complaint.citizenFeedback = feedback || '';
-      
+
       // Update legacy feedback field as well
       complaint.feedback = {
             rating,
@@ -340,10 +358,10 @@ export const getOfficerAnalytics = asyncHandler(async (req, res) => {
       // Base query for complaints assigned to this officer
       const totalAssigned = await Complaint.countDocuments({ assignedOfficer: officerId });
       const resolved = await Complaint.countDocuments({ assignedOfficer: officerId, status: 'resolved' });
-      const reportsGenerated = await Complaint.countDocuments({ 
-            assignedOfficer: officerId, 
-            status: 'resolved', 
-            resolutionReport: { $exists: true, $ne: '' } 
+      const reportsGenerated = await Complaint.countDocuments({
+            assignedOfficer: officerId,
+            status: 'resolved',
+            resolutionReport: { $exists: true, $ne: '' }
       });
 
       // Fetch complaints with ratings to compute average citizen rating
@@ -410,7 +428,7 @@ export const getAdminAnalytics = asyncHandler(async (req, res) => {
             const deptComplaints = await Complaint.find({ department: dept._id });
             const resolvedCount = deptComplaints.filter(c => c.status === 'resolved').length;
             const ratedList = deptComplaints.filter(c => c.citizenRating > 0);
-            
+
             let deptAvgRating = 0;
             if (ratedList.length > 0) {
                   const sum = ratedList.reduce((acc, curr) => acc + curr.citizenRating, 0);
@@ -517,6 +535,82 @@ Return ONLY the raw JSON string array. No markdown, no wrappers.`;
                   mostCommonComplaintCategories: commonCategories,
                   departmentPerformanceRankings: departmentRankings,
                   governanceInsights
+            }
+      });
+});
+
+
+// @desc    Download Report PDF
+// @route   GET /api/reports/download/:complaintId
+// @access  Private (Citizen, Officer, Admin)
+export const downloadReportPdf = asyncHandler(async (req, res) => {
+      const { complaintId } = req.params;
+
+      console.log(`📥 [reportController] Download request for Complaint ${complaintId} from user ${req.user._id} (${req.user.role})`);
+
+      const complaint = await Complaint.findById(complaintId)
+            .populate('citizen', 'name email')
+            .populate('assignedOfficer', 'name email')
+            .populate('department', 'name');
+
+      if (!complaint) {
+            console.log(`❌ [reportController] Complaint ${complaintId} not found`);
+            return res.status(404).json({ success: false, message: 'Complaint not found' });
+      }
+
+      // Authorization check
+      const isCitizenOwner = complaint.citizen && complaint.citizen._id.toString() === req.user._id.toString();
+      const isAssignedOfficer = complaint.assignedOfficer && complaint.assignedOfficer._id.toString() === req.user._id.toString();
+      const isAdmin = req.user.role === 'admin';
+      const isOfficer = req.user.role === 'officer';
+
+      if (!isCitizenOwner && !isAssignedOfficer && !isAdmin && !isOfficer) {
+            console.log(`❌ [reportController] User ${req.user._id} not authorized to download report for complaint ${complaintId}`);
+            return res.status(403).json({
+                  success: false,
+                  message: 'Not authorized to download this report'
+            });
+      }
+
+      // Check if report exists
+      if (!complaint.reportPdfUrl) {
+            console.log(`❌ [reportController] No reportPdfUrl found for complaint ${complaintId}`);
+            return res.status(404).json({
+                  success: false,
+                  message: 'Report PDF not generated yet'
+            });
+      }
+
+      const filePath = path.join(process.cwd(), complaint.reportPdfUrl);
+      console.log(`📁 [reportController] Checking file existence at: ${filePath}`);
+
+      // Verify file exists
+      if (!fs.existsSync(filePath)) {
+            console.log(`❌ [reportController] File not found at path: ${filePath}`);
+            return res.status(404).json({
+                  success: false,
+                  message: 'Report file not found on server'
+            });
+      }
+
+      console.log(`✅ [reportController] Serving file: ${filePath}`);
+
+      // Set appropriate headers
+      const filename = `Resolution_Report_${complaint.complaintId || complaint._id}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      // Stream the file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+            console.error(`❌ [reportController] Error streaming file: ${error.message}`);
+            if (!res.headersSent) {
+                  res.status(500).json({
+                        success: false,
+                        message: 'Error streaming PDF file'
+                  });
             }
       });
 });

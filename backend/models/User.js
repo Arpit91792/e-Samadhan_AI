@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
             city: { type: String, trim: true },
             state: { type: String, trim: true },
             pincode: { type: String, trim: true },
+            country: { type: String, trim: true },
             latitude: { type: String, trim: true },
             longitude: { type: String, trim: true },
             dob: { type: String, trim: true },

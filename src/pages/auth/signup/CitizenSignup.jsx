@@ -38,6 +38,7 @@ const GOVT_IDS = [
 ];
 
 const LOC = { IDLE: 'idle', REQUESTING: 'requesting', FETCHING: 'fetching', SUCCESS: 'success', DENIED: 'denied', ERROR: 'error' };
+const LOCATION_PERMISSION_HELP = 'Allow location for this site in browser settings. Android Chrome: tap the site controls, then Permissions > Location > Allow. iPhone Safari: enable Settings > Privacy & Security > Location Services > Safari Websites, then allow this site.';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function CitizenSignup() {
@@ -66,11 +67,12 @@ export default function CitizenSignup() {
       // Location
       const [locStatus, setLocStatus] = useState(LOC.IDLE);
       const [accuracy, setAccuracy] = useState(null);
+      const [locationError, setLocationError] = useState('');
 
       // Form
       const [form, setForm] = useState({
             name: '', email: '', phone: '', password: '', confirmPassword: '',
-            nearbyLocation: '', completeAddress: '', city: '', state: '', pincode: '', latitude: '', longitude: '',
+            nearbyLocation: '', completeAddress: '', city: '', state: '', pincode: '', country: '', latitude: '', longitude: '',
             govtIdType: 'aadhaar', govtIdNumber: '', dob: '', gender: '',
       });
 
@@ -81,65 +83,94 @@ export default function CitizenSignup() {
       };
 
       // ── Location ───────────────────────────────────────────────────────────────
-      const fetchLocation = useCallback(() => {
-            if (!navigator.geolocation) { toast.error(t('toastMessages.geolocationNotSupported')); return; }
+      const fetchLocation = useCallback(async () => {
+            setLocationError('');
+
+            if (window.isSecureContext === false && !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+                  setLocStatus(LOC.ERROR);
+                  setLocationError('Location requires HTTPS or localhost. This local network address is using HTTP; open the site over HTTPS to use GPS.');
+                  return;
+            }
+
+            if (!navigator.geolocation) {
+                  setLocStatus(LOC.ERROR);
+                  setLocationError('Location is not supported by this browser. Enter your address manually.');
+                  return;
+            }
+
             setLocStatus(LOC.REQUESTING);
+            try {
+                  const permission = navigator.permissions?.query
+                        ? await navigator.permissions.query({ name: 'geolocation' })
+                        : null;
+                  if (permission?.state === 'denied') {
+                        setLocStatus(LOC.DENIED);
+                        setLocationError(`Location permission is blocked. ${LOCATION_PERMISSION_HELP}`);
+                        return;
+                  }
+            } catch {
+                  // Permissions API is optional; getCurrentPosition handles unsupported browsers.
+            }
+
             navigator.geolocation.getCurrentPosition(
-                  async ({ coords: { latitude, longitude, accuracy: acc } }) => {
+                  async ({ coords }) => {
+                        const { latitude, longitude, accuracy: acc } = coords;
                         setLocStatus(LOC.FETCHING);
                         setAccuracy(Math.round(acc));
+                        setForm(p => ({ ...p, latitude: String(latitude), longitude: String(longitude) }));
                         try {
+                              const params = new URLSearchParams({
+                                    lat: String(latitude),
+                                    lon: String(longitude),
+                                    format: 'jsonv2',
+                                    addressdetails: '1',
+                              });
                               const res = await fetch(
-                                    `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
+                                    `https://nominatim.openstreetmap.org/reverse?${params}`,
                                     { headers: { 'Accept-Language': 'en-IN,en' } }
                               );
+                              if (!res.ok) throw new Error('Reverse geocoding request failed');
                               const data = await res.json();
                               const a = data.address || {};
 
-                              // Build address — works for both urban and rural areas
-                              const addressParts = [
-                                    a.house_number,
-                                    a.road || a.pedestrian || a.footway,
-                                    a.neighbourhood || a.suburb,
-                                    a.village || a.hamlet || a.locality,
-                              ].filter(Boolean);
-                              const address = addressParts.length > 0
-                                    ? addressParts.join(', ')
-                                    : (data.display_name?.split(',').slice(0, 4).join(', ') || '');
-
-                              // City — rural areas use village/town/hamlet
+                              const nearbyLocation = [
+                                    a.neighbourhood || a.suburb || a.quarter,
+                                    a.village || a.hamlet || a.town || a.city_district,
+                              ].filter(Boolean).join(', ') || data.display_name || '';
                               const city = a.city || a.town || a.village || a.hamlet || a.county || '';
-
-                              // State — normalize to match STATES array exactly
                               const rawState = a.state || '';
                               const matchedState = STATES.find(
                                     s => s.toLowerCase() === rawState.toLowerCase()
                               ) || STATES.find(
-                                    s => rawState.toLowerCase().includes(s.toLowerCase())
+                                    s => rawState.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(rawState.toLowerCase())
                               ) || rawState;
-
-                              const pincode = a.postcode || '';
 
                               setForm(p => ({
                                     ...p,
-                                    nearbyLocation: address,
+                                    nearbyLocation,
+                                    completeAddress: data.display_name || nearbyLocation,
                                     city,
                                     state: matchedState,
-                                    pincode,
-                                    latitude: String(latitude),
-                                    longitude: String(longitude),
+                                    pincode: a.postcode || '',
+                                    country: a.country || '',
                               }));
-                              setErrors(p => ({ ...p, nearbyLocation: '', city: '', state: '' }));
+                              setErrors(p => ({ ...p, completeAddress: '', city: '', state: '' }));
                               setLocStatus(LOC.SUCCESS);
                               toast.success(t('toastMessages.locationDetected'));
                         } catch {
                               setLocStatus(LOC.ERROR);
-                              toast.error(t('toastMessages.couldNotFetchAddress'));
+                              setLocationError('Location was detected, but the address could not be retrieved. Retry or enter your address manually.');
                         }
                   },
                   (err) => {
+                        const messages = {
+                              1: `Location permission denied. ${LOCATION_PERMISSION_HELP}`,
+                              2: 'GPS or network location is unavailable. Turn on device Location and check your network, then retry.',
+                              3: 'Location request timed out. Check that device Location is on and retry.',
+                        };
+                        const message = messages[err.code] || 'Could not detect your location. Enter your address manually or retry.';
                         setLocStatus(err.code === 1 ? LOC.DENIED : LOC.ERROR);
-                        toast.error(err.code === 1 ? t('location.denied') : t('location.locationFailed'));
+                        setLocationError(message);
                   },
                   { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
@@ -291,24 +322,36 @@ export default function CitizenSignup() {
                                     ) : locStatus === LOC.SUCCESS ? (
                                           <><CheckCircle2 className="w-5 h-5" /><span>Location Detected — Click to Refresh</span></>
                                     ) : locStatus === LOC.DENIED ? (
-                                          <><WifiOff className="w-5 h-5" /><span>Permission Denied — Click to Retry</span></>
+                                          <><WifiOff className="w-5 h-5" /><span>Permission Denied — Retry Location</span></>
+                                    ) : locStatus === LOC.ERROR ? (
+                                          <><LocateFixed className="w-5 h-5" /><span>Retry Location</span></>
                                     ) : (
                                           <><LocateFixed className="w-5 h-5" /><span>📍 Use Current Location</span></>
                                     )}
                               </motion.button>
+
+                              <p className="text-xs text-gray-500" role="note">
+                                    Location access requires HTTPS or localhost. A local network IP using plain HTTP cannot access GPS.
+                              </p>
+
+                              {locationError && (
+                                    <div className="flex items-start gap-3 p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-800" role="alert">
+                                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                          <div className="flex-1 space-y-2">
+                                                <p>{locationError}</p>
+                                                <button type="button" onClick={fetchLocation}
+                                                      className="inline-flex items-center gap-1.5 font-semibold underline underline-offset-2">
+                                                      <LocateFixed className="w-3.5 h-3.5" /> Retry location
+                                                </button>
+                                          </div>
+                                    </div>
+                              )}
 
                               {locStatus === LOC.SUCCESS && accuracy && (
                                     <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700">
                                           <Wifi className="w-3.5 h-3.5" /><span>GPS accuracy: ±{accuracy}m — Fields auto-filled. You can edit them.</span>
                                     </div>
                               )}
-                              {locStatus === LOC.DENIED && (
-                                    <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
-                                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                          <span>Allow location: click 🔒 in browser address bar → Allow Location → retry.</span>
-                                    </div>
-                              )}
-
                               <div className="flex items-center gap-3">
                                     <div className="flex-1 h-px bg-gray-200" />
                                     <span className="text-xs text-gray-400 px-2">or enter manually</span>
@@ -353,6 +396,9 @@ export default function CitizenSignup() {
                                     <Input icon={MapPin} value={form.pincode}
                                           onChange={e => set('pincode', e.target.value.replace(/\D/, '').slice(0, 6))}
                                           placeholder="400001" maxLength={6} />
+                              </Field>
+                              <Field label="Country">
+                                    <Input icon={MapPin} value={form.country} onChange={e => set('country', e.target.value)} placeholder="India" autoComplete="country-name" />
                               </Field>
                         </>}
 

@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute, RoleRoute, PublicRoute, AdminPublicRoute, AdminRoleRoute } from './components/auth/ProtectedRoute';
 import RoutePageLoader from './components/ui/PageLoader';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import ChatbotProvider from './components/Chatbot/ChatbotProvider';
 
 // ─── Landing page — eager loaded (always shown first) ─────────────────────────
 import Navbar from './components/Navbar';
@@ -74,6 +75,8 @@ export default function App() {
             <BrowserRouter>
                   <AuthProvider>
                         <Toaster position="top-right" toastOptions={toastOptions} />
+                        {/* Global AI Assistant Chatbot - Available on every page */}
+                        <ChatbotProvider />
                         <Suspense fallback={<RoutePageLoader />}>
                               <Routes>
                                     {/* Landing */}

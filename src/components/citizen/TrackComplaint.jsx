@@ -8,6 +8,7 @@ import { useSocket } from '../../hooks/useSocket';
 import StatusBadge from './StatusBadge';
 import ComplaintTimeline from './ComplaintTimeline';
 import ComplaintMapView from '../maps/ComplaintMapView';
+import ActivityTimeline from '../ActivityTimeline';
 import { deptLabel } from '../../utils/complaintConstants';
 
 export default function TrackComplaint({ initialId = '' }) {
@@ -99,6 +100,15 @@ export default function TrackComplaint({ initialId = '' }) {
                                     address={complaint.location?.address}
                               />
                               <ComplaintTimeline status={complaint.status} timeline={complaint.timeline} />
+
+                              {/* Activity Timeline */}
+                              <div className="mt-6">
+                                    <ActivityTimeline
+                                          complaintId={complaint._id}
+                                          showHeader={true}
+                                          autoRefresh={true}
+                                    />
+                              </div>
                         </motion.div>
                   )}
             </motion.div>

@@ -182,6 +182,10 @@ Do not add any text before or after this JSON.`;
                   errorMessage = "Too many requests to AI service";
             } else if (error.status === 401) {
                   errorMessage = "AI service authentication failed";
+            } else if (error.status === 403) {
+                  errorMessage = "Gemini API key is invalid or does not have permission to use this API";
+            } else if (error.status === 404) {
+                  errorMessage = "Gemini model was not found or is unavailable for this API key";
             } else if (error.status === 400) {
                   errorMessage = "Invalid request to AI service";
             }
